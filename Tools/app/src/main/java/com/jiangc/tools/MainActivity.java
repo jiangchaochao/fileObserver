@@ -20,21 +20,12 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         String path = Environment.getExternalStorageDirectory().getAbsolutePath();
 
-
-        FileObserverJni.FileObserverInit(path + "/ftpFile");   //初始化要监听的路径
-        FileObserverJni.setmCallback(new FileObserverJni.Callback() {
+        FileObserverJni fileObserverJni = new FileObserverJni(path + "/ftpFile", FileObserverJni.ALL_EVENTS);
+        fileObserverJni.setmCallback(new FileObserverJni.Callback() {
             @Override
-            public void CreateEvent(String path) {
-                Log.e(TAG, "CreateEvent: " + path);
-            }
+            public void FileObserverEvent(String path, int mask) {
 
-            @Override
-            public void DeleteEvent(String path) {
-                Log.e(TAG, "DeleteEvent: " + path);
             }
         });
-
-
-
     }
 }

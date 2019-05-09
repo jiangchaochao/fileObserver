@@ -46,6 +46,13 @@ int inotifyWd[4096] = {-1};        //保存 inotify_add_watch 返回值，删除
 
 char monitorPath[1024]={0};       //用来保存监听的目录
 
+typedef struct {
+    char path[4096];
+    int mask;
+}ST_MASK;
+
+ST_MASK stMask;
+
 
 static char *epoll_files[MAX_FILES];
 
@@ -76,7 +83,6 @@ int getfdFromName(char* name)
 	{
 		if (!epoll_files[i])
 			continue;
-
 		if(0 == strcmp(name,epoll_files[i]))
 		{
 			return i;
@@ -86,54 +92,11 @@ int getfdFromName(char* name)
 }
 
 
-/**
- *
- *create event
- */
-void CreateEvent(JNIEnv *env, jclass cls, char *path)
-{
-    jmethodID jmethodid = NULL;
-    jmethodid = (*env)->GetStaticMethodID(env, cls, "CreateEvent", "(Ljava/lang/String;)V");
-    if (jmethodid == NULL)
-    {
-        LOGE("create event   jmethodid == null");
-        return ;
-    }
-    jstring str = (*env)->NewStringUTF(env, path);
-    (*env)->CallStaticVoidMethod(env, cls, jmethodid, str);
-
-    /*delete local reference*/
-    (*env)->DeleteLocalRef(env, str);
-}
-
-/**
- *
- *delete event
- *
- */
-void DeleteEvent(JNIEnv *env, jclass cls,char *path)
-{
-    jmethodID jmethodid = NULL;
-    jmethodid = (*env)->GetStaticMethodID(env, cls, "DeleteEvent", "(Ljava/lang/String;)V");
-    if (jmethodid == NULL)
-    {
-        LOGE("delete event   jmethodid == null");
-        return ;
-    }
-
-    jstring str = (*env)->NewStringUTF(env, path);
-    (*env)->CallStaticVoidMethod(env, cls, jmethodid, str);
-
-    /*delete local reference*/
-    (*env)->DeleteLocalRef(env, str);
-}
-
-
-
 struct inotify_event*  curInotifyEvent;
 char name[30];
 int readCount = 0;
 int fd;
+char cFilePath[4096] = {0};
 
 
 void scan_dir(const char *dir, int depth)   // 定义目录扫描函数
@@ -164,7 +127,6 @@ void scan_dir(const char *dir, int depth)   // 定义目录扫描函数
 			if (NULL != path1)
 			{
 				lnotifyFD = inotify_init();
-
 				sprintf(path, "%s/%s", path1, entry->d_name);   //get absolute path
 				lwd = inotify_add_watch(lnotifyFD, path, IN_DELETE | IN_CREATE);//监听xxx目录下的 delete、create事件
 				if (-1 == lwd)
@@ -198,54 +160,97 @@ void scan_dir(const char *dir, int depth)   // 定义目录扫描函数
 char creatPath[1024] = {0};
 char deletePath[1024] = {0};
 int a = -1;
-int *fileObserver_init(const char *path)
+void Event(JNIEnv *env, jclass cls, char *path, int mask)
 {
-    int i = 0;
+	jmethodID jmethodid;
+    jmethodid = (*env)->GetStaticMethodID(env, cls, "FileObserverEvent", "(Ljava/lang/String;I)V");
+    if (jmethodid == NULL)
+    {
+        LOGE("event   jmethodid == null");
+        return ;
+    }
+    jstring str = (*env)->NewStringUTF(env, path);
+    (*env)->CallStaticVoidMethod(env, cls, jmethodid, str, mask);
+    (*env)->DeleteLocalRef(env, str);
+}
+
+/**
+*事件处理函数
+*/
+void ProcessEvent(JNIEnv *env, jclass cls, const char *pathName, const char *fileName, int mask)
+{
+	memset(cFilePath, 0, sizeof(cFilePath));
+	sprintf(cFilePath, "%s/%s", pathName, fileName);
+	Event(env, cls,cFilePath, mask);
+}
+
+/**
+*
+*/
+int *fileObserver_init(ST_MASK *stMask)
+{
+	int i;
 	struct epoll_event eventItem;        //epoll event
-	struct inotify_event  inotifyEvent;  //inotify event
+	struct inotify_event inotifyEvent;  //inotify event
 	JNIEnv *env;
-	jmethodID jmethodid = NULL;
+	jmethodID jmethodid;
+
+    char path[4096];
+    int mask;
+
+	i = 0;
+	memset(&eventItem, 0, sizeof(struct epoll_event));
+	memset(&inotifyEvent, 0, sizeof(struct inotify_event));
+	env = NULL;
+	jmethodid = 0;
+	memset(path, 0, sizeof(path));
+    mask = 0;
+
+    if (NULL == stMask)
+    {
+        return (int *)-1;
+    }
+    memcpy(path, stMask->path, sizeof(path));
+    mask = stMask->mask;
 
 	if (gl_jvm == NULL)
     {
     	LOGE("gl_jvm is NULL");
     	return (int *)-1;
     }
+
 	(*gl_jvm)->AttachCurrentThread(gl_jvm, &env, NULL);
+
 	//0. add sub dir inotify
-	if (NULL == path)
-	{
-	    LOGE("path == null \n");
-		a = -1;
-		return &a;
-	}
 	mEpollFd = epoll_create(1000);
 	// 1. init inotify &  epoll
 	int homeINotifyFd = inotify_init();
-	char *p = malloc(strlen(path));
+	char *p = malloc(strlen(path) + 1);
 	if (NULL == p)
 	{
 	    LOGE("malloc failed  = NULL \n");
 		a = -1;
 		return &a;
 	}
-	memset(p, 0, strlen(path));
-	memcpy(p, path, strlen(path));
+	memset(p, 0, strlen(path) + 1);
+	memcpy(p, path, strlen(path) + 1);
 	pathName[homeINotifyFd] = p;
-//	LOGE("pathName[homeINotifyFd] = %s\n", pathName[homeINotifyFd]);
 	// 2.add inotify watch dir
-	int lwd = inotify_add_watch(homeINotifyFd, pathName[homeINotifyFd], IN_DELETE | IN_CREATE);//监听xxx目录下的 delete、create事件
+	int lwd = inotify_add_watch(homeINotifyFd, pathName[homeINotifyFd], mask);//监听xxx目录下的 mask事件
 	if (-1 == lwd)
 	{
 	    LOGE(" inotify_add_watch  -------> errno = %d\n", errno);
 		return &a;
 	}
+
 	inotifyWd[homeINotifyFd] = lwd;
+
 	// 3. add inotify fd to epoll
 	eventItem.events = EPOLLIN;
 	eventItem.data.fd = homeINotifyFd;
 	epoll_ctl(mEpollFd, EPOLL_CTL_ADD, homeINotifyFd, &eventItem);
 	scan_dir(path, 0);
+
 	while(RUN)
 	{
 		// 4.epoll检测文件的可读变化
@@ -272,30 +277,116 @@ int *fileObserver_init(const char *path)
 					{
 						if (pathName[mPendingEventItems[i].data.fd] != NULL)
 						{
-							memset(creatPath, 0, sizeof(creatPath));
-							sprintf(creatPath, "%s/%s", pathName[mPendingEventItems[i].data.fd], curInotifyEvent->name);
-						//	LOGE("create event path = %s\n", creatPath);
-							CreateEvent(env, gl_class,creatPath);
+							ProcessEvent(env, gl_class, pathName[mPendingEventItems[i].data.fd], curInotifyEvent->name, IN_CREATE);
 						}
 						else
 						{
-							LOGE("create name[mPendingEventItems[i].data.fd] == NULL\n");
+							LOGE("IN_CREATE name[mPendingEventItems[i].data.fd] == NULL\n");
 						}
-
 					}
 					else if(curInotifyEvent->mask & IN_DELETE)
 					{
 						if (pathName[mPendingEventItems[i].data.fd] != NULL)
 						{
-							memset(deletePath, 0, sizeof(deletePath));
-							sprintf(deletePath, "%s/%s", pathName[mPendingEventItems[i].data.fd], curInotifyEvent->name);
-						//	LOGE("delete event path = %s\n", deletePath);
-							DeleteEvent(env, gl_class,deletePath);
+						ProcessEvent(env, gl_class, pathName[mPendingEventItems[i].data.fd], curInotifyEvent->name, IN_DELETE);
 						}else
 						{
-							LOGE("delete name[mPendingEventItems[i].data.fd] == NULL\n");
+							LOGE("IN_DELETE name[mPendingEventItems[i].data.fd] == NULL\n");
+						}
+					}else if (curInotifyEvent->mask & IN_ACCESS)
+					{
+						if (pathName[mPendingEventItems[i].data.fd] != NULL)
+						{
+							ProcessEvent(env, gl_class, pathName[mPendingEventItems[i].data.fd], curInotifyEvent->name, IN_ACCESS);
+						}else
+						{
+							LOGE("IN_ACCESS name[mPendingEventItems[i].data.fd] == NULL\n");
+						}
+					}else if (curInotifyEvent->mask & IN_ATTRIB)
+					{
+						if (pathName[mPendingEventItems[i].data.fd] != NULL)
+						{
+							ProcessEvent(env, gl_class, pathName[mPendingEventItems[i].data.fd], curInotifyEvent->name, IN_ATTRIB);
+						}else
+						{
+							LOGE("IN_ATTRIB name[mPendingEventItems[i].data.fd] == NULL\n");
+						}
+					}else if (curInotifyEvent->mask & IN_CLOSE_WRITE)
+					{
+						if (pathName[mPendingEventItems[i].data.fd] != NULL)
+						{
+							ProcessEvent(env, gl_class, pathName[mPendingEventItems[i].data.fd], curInotifyEvent->name, IN_CLOSE_WRITE);
+						}else
+						{
+							LOGE("IN_CLOSE_WRITE name[mPendingEventItems[i].data.fd] == NULL\n");
 						}
 
+					}else if (curInotifyEvent->mask & IN_CLOSE_NOWRITE)
+					{
+						if (pathName[mPendingEventItems[i].data.fd] != NULL)
+						{
+							ProcessEvent(env, gl_class, pathName[mPendingEventItems[i].data.fd], curInotifyEvent->name, IN_CLOSE_NOWRITE);
+						}else
+						{
+							LOGE("IN_CLOSE_NOWRITE name[mPendingEventItems[i].data.fd] == NULL\n");
+						}
+
+					}else if (curInotifyEvent->mask & IN_DELETE_SELF)
+					{
+						if (pathName[mPendingEventItems[i].data.fd] != NULL)
+						{
+							ProcessEvent(env, gl_class, pathName[mPendingEventItems[i].data.fd], curInotifyEvent->name, IN_DELETE_SELF);
+						}else
+						{
+							LOGE("IN_DELETE_SELF name[mPendingEventItems[i].data.fd] == NULL\n");
+						}
+					}else if (curInotifyEvent->mask & IN_MODIFY)
+					{
+						if (pathName[mPendingEventItems[i].data.fd] != NULL)
+						{
+							ProcessEvent(env, gl_class, pathName[mPendingEventItems[i].data.fd], curInotifyEvent->name, IN_MODIFY);
+						}else
+						{
+							LOGE("IN_MODIFY name[mPendingEventItems[i].data.fd] == NULL\n");
+						}
+
+					}else if (curInotifyEvent->mask & IN_MOVE_SELF)
+					{
+						if (pathName[mPendingEventItems[i].data.fd] != NULL)
+						{
+							ProcessEvent(env, gl_class, pathName[mPendingEventItems[i].data.fd], curInotifyEvent->name, IN_MOVE_SELF);
+						}else
+						{
+							LOGE("IN_MOVE_SELF name[mPendingEventItems[i].data.fd] == NULL\n");
+						}
+					}else if (curInotifyEvent->mask & IN_MOVED_FROM)
+					{
+						if (pathName[mPendingEventItems[i].data.fd] != NULL)
+						{
+							ProcessEvent(env, gl_class, pathName[mPendingEventItems[i].data.fd], curInotifyEvent->name, IN_MOVED_FROM);
+						}else
+						{
+							LOGE("IN_MOVED_FROM name[mPendingEventItems[i].data.fd] == NULL\n");
+						}
+
+					}else if (curInotifyEvent->mask & IN_MOVED_TO)
+					{
+						if (pathName[mPendingEventItems[i].data.fd] != NULL)
+						{
+							ProcessEvent(env, gl_class, pathName[mPendingEventItems[i].data.fd], curInotifyEvent->name, IN_MOVED_TO);
+						}else
+						{
+							LOGE("IN_MOVED_TO name[mPendingEventItems[i].data.fd] == NULL\n");
+						}
+					}else if (curInotifyEvent->mask & IN_OPEN)
+					{
+						if (pathName[mPendingEventItems[i].data.fd] != NULL)
+						{
+							ProcessEvent(env, gl_class, pathName[mPendingEventItems[i].data.fd], curInotifyEvent->name, IN_OPEN);
+						}else
+						{
+							LOGE("IN_OPEN name[mPendingEventItems[i].data.fd] == NULL\n");
+						}
 					}
 				}
 				curInotifyEvent --;
@@ -307,8 +398,6 @@ int *fileObserver_init(const char *path)
      LOGE("退出");
 	return 0;
 }
-
-
 
 /**
  *
@@ -333,11 +422,17 @@ int FileObserverDestroy()
 
 pthread_t thread_1 = -1;
 
-int FileObserverInit(const char *path)
+
+
+
+int FileObserverInit(const char *path, int mask)
 {
+    memset(&stMask, 0, sizeof(ST_MASK));
+    memcpy(stMask.path, path, strlen(path));
+    stMask.mask = mask;
 	if (-1 == thread_1)
 	{
-		pthread_create(&thread_1, NULL, (void * (*)(void *))fileObserver_init, path);
+		pthread_create(&thread_1, NULL, (void * (*)(void *))fileObserver_init, &stMask);
 	}
 	return 0;
 }
@@ -346,13 +441,14 @@ int FileObserverInit(const char *path)
 extern "C" {
 #endif
 /*
- * Class:     com_jiangc_fileobserver_FileObserverJni
+ * Class:     com_jiangc_receiver_FileObserverJni
  * Method:    FileObserverInit
- * Signature: (Ljava/lang/String;)I
+ * Signature: (Ljava/lang/String;I)I
  */
-JNIEXPORT jint JNICALL Java_com_jiangc_receiver_FileObserverJni_FileObserverInit(JNIEnv *env, jclass clazz, jstring path)
+JNIEXPORT jint JNICALL Java_com_jiangc_receiver_FileObserverJni_FileObserverInit(JNIEnv *env, jclass clazz, jstring path, jint mask)
   {
         const char *str = (*env)->GetStringUTFChars(env, path, 0);
+
         memset(monitorPath, 0, sizeof(monitorPath));
         memcpy(monitorPath, str, strlen(str));
 
@@ -363,8 +459,7 @@ JNIEXPORT jint JNICALL Java_com_jiangc_receiver_FileObserverJni_FileObserverInit
          	LOGE("gl_jvm = NULL");
          }
         gl_class = (*env)->NewGlobalRef(env, clazz);
-        LOGE("");
-        FileObserverInit(monitorPath);
+        FileObserverInit(monitorPath, mask);
         (*env)->ReleaseStringUTFChars(env, path, str);
         return 0;
   }
