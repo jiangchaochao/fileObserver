@@ -8,17 +8,18 @@ Android JNI 监控指定目录下的文件以及子目录及子目录下的文�
 
 
 ```
- /**
-  * Create a new file observer for a certain file or directory And start it.
-  * @param path The file or directory to monitor
-  * @param mask The event or events (added together) to watch for
-  */
-public FileObserverJni(String path, int mask)   //推荐使用
+主要API：
+       /**
+        * Create a new file observer for a certain file or directory And start it.
+        * @param path The file or directory to monitor
+        * @param mask The event or events (added together) to watch for
+        */
+        public FileObserverJni(String path, int mask)   //推荐使用
 
- /**
-  * Equivalent to FileObserver(path, FileObserver.ALL_EVENTS).
-  */
-  public FileObserverJni(String path)
+       /**
+        * Equivalent to FileObserver(path, FileObserver.ALL_EVENTS).
+        */
+        public FileObserverJni(String path)
   
 例子：
         String path = Environment.getExternalStorageDirectory().getAbsolutePath();
