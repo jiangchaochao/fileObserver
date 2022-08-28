@@ -49,3 +49,9 @@ Android JNI 监控指定目录下的文件以及子目录及子目录下的文�
 1.锤子坚果pro事件有问题，除了删除，其他都不好用
 
 
+
+##### 2022/08/28
+
+1. 修改项目为Androidx
+2. 修改项目Android.mk 为CMakeLists.txt
+3. 修正没有回调Java接口的bug
