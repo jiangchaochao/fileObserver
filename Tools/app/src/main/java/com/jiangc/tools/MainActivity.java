@@ -2,6 +2,7 @@ package com.jiangc.tools;
 
 import android.os.Environment;
 import android.os.Bundle;
+import android.util.Log;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -20,10 +21,11 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         String path = Environment.getExternalStorageDirectory().getAbsolutePath();
 
-        FileObserverJni fileObserverJni = new FileObserverJni(path + "/ftpFile", FileObserverJni.ALL_EVENTS);
+        FileObserverJni fileObserverJni = new FileObserverJni(path, FileObserverJni.ALL_EVENTS);
         fileObserverJni.setmCallback(new FileObserverJni.Callback() {
             @Override
             public void FileObserverEvent(String path, int mask) {
+                Log.e(TAG, "FileObserverEvent: xxxxxxxxxxxxxx");
                 // 在这里监听事件
             }
         });
