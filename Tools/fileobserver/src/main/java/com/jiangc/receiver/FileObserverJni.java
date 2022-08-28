@@ -80,7 +80,7 @@ public class FileObserverJni {
     }
 
 
-    public static void setmCallback(Callback mCallback) {
+    public void setmCallback(Callback mCallback) {
         FileObserverJni.mCallback = mCallback;
     }
 

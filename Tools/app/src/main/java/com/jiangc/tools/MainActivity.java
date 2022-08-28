@@ -2,8 +2,8 @@ package com.jiangc.tools;
 
 import android.os.Environment;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.jiangc.receiver.FileObserverJni;
 
@@ -24,7 +24,7 @@ public class MainActivity extends AppCompatActivity {
         fileObserverJni.setmCallback(new FileObserverJni.Callback() {
             @Override
             public void FileObserverEvent(String path, int mask) {
-
+                // 在这里监听事件
             }
         });
     }
