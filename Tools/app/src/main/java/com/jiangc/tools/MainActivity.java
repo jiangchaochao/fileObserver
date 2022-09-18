@@ -21,7 +21,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 //        String path = Environment.getExternalStorageDirectory().getAbsolutePath();
-        String path = Environment.getExternalStorageDirectory().getAbsolutePath() + "/DCIM/";
+        String path = Environment.getExternalStorageDirectory().getAbsolutePath();
         Log.e(TAG, "onCreate: " + path);
 
         FileObserverJni fileObserverJni = new FileObserverJni(path, FileObserverJni.ALL_EVENTS, new FileObserverJni.ILifecycle() {
@@ -46,8 +46,18 @@ public class MainActivity extends AppCompatActivity {
         fileObserverJni.setmCallback(new FileObserverJni.Callback() {
             @Override
             public void FileObserverEvent(String path, int mask) {
-                Log.e(TAG, "FileObserverEvent: xxxxxxxxxxxxxx :  " + path);
                 // 在这里监听事件
+                switch (mask) {
+                    case FileObserverJni.CREATE:
+                        Log.e(TAG, "FileObserverEvent: 文件创建：" + path);
+                        break;
+                    case FileObserverJni.DELETE:
+                        Log.e(TAG, "FileObserverEvent: 文件删除：" + path);
+                        break;
+                    case FileObserverJni.MODIFY:
+                        Log.e(TAG, "FileObserverEvent: 文件修改：" + path);
+                        break;
+                }
             }
         });
     }

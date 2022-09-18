@@ -8,7 +8,7 @@ demo中未申请存储权限，使用时需要手动打开或者申请存储权�
 #### 使用方式
 
 
-```
+```java
 主要API：
        /**
         * Create a new file observer for a certain file or directory And start it.
@@ -49,8 +49,18 @@ demo中未申请存储权限，使用时需要手动打开或者申请存储权�
         fileObserverJni.setmCallback(new FileObserverJni.Callback() {
             @Override
             public void FileObserverEvent(String path, int mask) {
-                Log.e(TAG, "FileObserverEvent: xxxxxxxxxxxxxx :  " + path);
                 // 在这里监听事件
+                switch (mask) {
+                    case FileObserverJni.CREATE:
+                        Log.e(TAG, "FileObserverEvent: 文件创建：" + path);
+                        break;
+                    case FileObserverJni.DELETE:
+                        Log.e(TAG, "FileObserverEvent: 文件删除：" + path);
+                        break;
+                    case FileObserverJni.MODIFY:
+                        Log.e(TAG, "FileObserverEvent: 文件修改：" + path);
+                        break;
+                }
             }
         });
 
@@ -83,3 +93,4 @@ demo中未申请存储权限，使用时需要手动打开或者申请存储权�
 1. 增加初始化及退出回调
 2. 增加错误码转换接口
 3. 禁用Android Q 分区存储
+4. 增加使用示例
