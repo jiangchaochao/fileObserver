@@ -14,21 +14,42 @@ Android JNI 监控指定目录下的文件以及子目录及子目录下的文�
         * @param path The file or directory to monitor
         * @param mask The event or events (added together) to watch for
         */
-        public FileObserverJni(String path, int mask)   //推荐使用
+        public FileObserverJni(String path, int mask, ILifecycle callback) //推荐使用
 
        /**
         * Equivalent to FileObserver(path, FileObserver.ALL_EVENTS).
         */
         public FileObserverJni(String path)
+        
   
 例子：
         String path = Environment.getExternalStorageDirectory().getAbsolutePath();
+        Log.e(TAG, "onCreate: " + path);
 
-        FileObserverJni fileObserverJni = new FileObserverJni(path + "/ftpFile", FileObserverJni.ALL_EVENTS);
+        FileObserverJni fileObserverJni = new FileObserverJni(path, FileObserverJni.ALL_EVENTS, new FileObserverJni.ILifecycle() {
+            @Override
+            public void onInit(int errno) {
+                if (0 == errno) {
+                    Log.e(TAG, "onInit: 初始化成功");
+                } else {
+                    Log.e(TAG, "onInit: 初始化失败: " + FileObserverJni.error2String(errno));
+                }
+            }
+
+            @Override
+            public void onExit(int errno) {
+                if (0 == errno) {
+                    Log.e(TAG, "onExit: 正常退出");
+                } else {
+                    Log.e(TAG, "onExit: 异常退出: " + errno);
+                }
+            }
+        });
         fileObserverJni.setmCallback(new FileObserverJni.Callback() {
             @Override
             public void FileObserverEvent(String path, int mask) {
-                  //这里根据mask做事件的判断
+                Log.e(TAG, "FileObserverEvent: xxxxxxxxxxxxxx :  " + path);
+                // 在这里监听事件
             }
         });
 
@@ -55,3 +76,9 @@ Android JNI 监控指定目录下的文件以及子目录及子目录下的文�
 1. 修改项目为Androidx
 2. 修改项目Android.mk 为CMakeLists.txt
 3. 修正没有回调Java接口的bug
+
+##### 2022/09/18
+
+1. 增加初始化及退出回调
+2. 增加错误码转换接口
+3. 禁用Android Q 分区存储
