@@ -66,6 +66,7 @@ public class FileObserverJni {
 
 
     private static Callback mCallback = null;
+    private static ILifecycle mInitCallback = null;
 
     /**
      * Equivalent to FileObserver(path, FileObserver.ALL_EVENTS).
@@ -80,8 +81,14 @@ public class FileObserverJni {
      * @param path The file or directory to monitor
      * @param mask The event or events (added together) to watch for
      */
+    @Deprecated
     public FileObserverJni(String path, int mask) {
+        this(path, mask, null);
+    }
+
+    public FileObserverJni(String path, int mask, ILifecycle callback) {
         FileObserverInit(path, mask);
+        FileObserverJni.mInitCallback = callback;
     }
 
     public interface Callback {
@@ -94,6 +101,20 @@ public class FileObserverJni {
         void FileObserverEvent(String path, int mask);
     }
 
+    /**
+     * 初始化回调
+     */
+    public interface ILifecycle {
+        /**
+         * 初始化失败时会回调该接口，具体错误原因可使用error2String查看
+         *
+         * @param errno 错误码
+         */
+        void onInit(int errno);
+
+        void onExit(int errno);
+    }
+
 
     /**
      * 总的事件入口，供native调用
@@ -102,7 +123,6 @@ public class FileObserverJni {
      * @param mask
      */
     private static void FileObserverEvent(String path, int mask) {
-        Log.e(TAG, "Event: path = " + path + "    " + mask);
         if (mCallback != null) {
             mCallback.FileObserverEvent(path, mask);
         }
@@ -130,10 +150,42 @@ public class FileObserverJni {
      */
     public static native int FileObserverInit(String path, int mask);
 
+
     /**
      * 释放资源
      *
      * @return
      */
     public static native int FileObserverDestroy();
+
+    /**
+     * 错误码转字符串
+     *
+     * @param errno callback中的错误码
+     * @return 错误原因
+     */
+    public static native String error2String(int errno);
+
+
+    /**
+     * native回调
+     *
+     * @param errno 错误码 0初始化成功，其他:异常，查看错误码
+     */
+    public static void onInit(int errno) {
+        if (null != mInitCallback) {
+            mInitCallback.onInit(errno);
+        }
+    }
+
+    /**
+     * native回调
+     *
+     * @param errno 错误码   0正常退出，其他:异常
+     */
+    public static void onExit(int errno) {
+        if (null != mInitCallback) {
+            mInitCallback.onExit(errno);
+        }
+    }
 }
